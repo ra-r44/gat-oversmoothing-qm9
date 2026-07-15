@@ -9,7 +9,7 @@ Results
 I trained the models on QM9 using Kaggle. Here's what it looks like (validation loss on the left, embedding diversity vs depth on the right). You can see the baseline model's embeddings totally collapse as it gets deeper, while the fixes hold up pretty well.
 
 Kaggle Results
-
+ <img width="1390" height="490" alt="__results___16_0" src="https://github.com/user-attachments/assets/716968cf-3f76-4fb8-b32e-4a568c43bff6" />
 Running it locally
 You'll need Python 3.8+ and a virtual environment (highly recommended, torch and rdkit can get messy otherwise).
 
