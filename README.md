@@ -1,19 +1,70 @@
-GAT Over-smoothing Explorer
-A quick tool I put together to look at over-smoothing in Graph Attention Networks (GATs) using QM9 molecular graphs.
 
-Basically, when you stack too many layers in a GNN, all the node embeddings start looking exactly the same. For molecules, this means the network forgets how to tell different atoms apart.
+# GAT Over-smoothing Explorer
 
-This repo has a small Gradio app where you can type in a molecule (as a SMILES string) and watch it happen. It runs the molecule through three different GAT setups (plain, with residual connections, and with LayerNorm) up to 16 layers deep, and plots the node diversity at each step. The plain one collapses, the other two don't.
+This is a project I built to look at a specific problem in graph neural networks: over-smoothing. If you've spent time with GNNs, you know that unlike standard CNNs, stacking more layers usually makes the model worse, not better. 
 
-Results
-I trained the models on QM9 using Kaggle. Here's what it looks like (validation loss on the left, embedding diversity vs depth on the right). You can see the baseline model's embeddings totally collapse as it gets deeper, while the fixes hold up pretty well.
+This repo has a small Gradio app where you can type in a molecule (as a SMILES string) and watch over-smoothing happen in real-time. It builds a molecular graph, runs it through three different Graph Attention Network (GAT) setups up to 16 layers deep, and plots the node diversity at each step.
 
+## The Problem: Over-smoothing
+
+In a GNN, every layer passes messages between connected nodes (atoms). If you do this too many times, the embeddings for all the nodes start to converge and look exactly the same. For molecules, this means the network forgets how to tell a carbon atom from an oxygen atom. That's over-smoothing.
+
+To test this, I built three model variations:
+1. Baseline: A plain stacked GAT with BatchNorm. No mitigation.
+2. Residual: The same setup, but with skip connections added to preserve earlier information.
+3. LayerNorm: Swapping out BatchNorm for LayerNorm to normalize across features instead of the batch.
+
+## Results
+
+I trained all three models on the QM9 dataset using Kaggle. The chart below shows what happened. 
+
+On the left is the validation loss during training. On the right is the Mean Average Distance (MAD) of the node embeddings as the networks get deeper. MAD just measures how far apart the embeddings are. When MAD drops toward zero, the embeddings have collapsed.
+
+As you can see, the baseline model's embeddings totally collapse as it gets deeper. The Residual and LayerNorm fixes hold up much better.
 Kaggle Results
  <img width="1390" height="490" alt="__results___16_0" src="https://github.com/user-attachments/assets/716968cf-3f76-4fb8-b32e-4a568c43bff6" />
-Running it locally
-You'll need Python 3.8+ and a virtual environment (highly recommended, torch and rdkit can get messy otherwise).
 
-pip install -r requirements.txtpython app.py
-Then just open http://127.0.0.1:7860 in your browser.
+## What's in this repo
 
-Note: It only takes H, C, N, O, and F atoms since that's what QM9 covers, and I capped it at 60 atoms so it runs fast
+- `app.py`: The Gradio web interface. This is what you run to launch the local website.
+- `models.py`: The PyTorch implementations of the three GAT architectures.
+- `featurize.py`: Turns a SMILES string into the graph tensors (node features and edge indices) the models expect. It uses RDKit to build the molecule on the fly.
+- `metrics.py`: The math for calculating Mean Average Distance (MAD).
+- `requirements.txt`: The Python dependencies.
+- `checkpoints/`: Contains the trained `.pt` weight files generated from the Kaggle training run. If the app sees these, it uses them instead of random weights.
+
+## Running it locally
+
+To run this on your machine, you need Python 3.8 or newer. Do yourself a favor and use a virtual environment, because installing PyTorch and RDKit in your global environment can get messy.
+
+1. Clone or download this repository.
+2. Activate your virtual environment.
+3. Install the dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+*Note on PyTorch Geometric: Depending on your OS and whether you have a GPU, `torch_geometric` can sometimes be annoying to install via the standard requirements file. If the pip install fails, check the [PyG installation guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html) and install the wheels manually.*
+
+4. Run the app:
+
+```bash
+python app.py
+```
+
+5. Open your browser and go to `http://127.0.0.1:7860`.
+
+## Using the app
+
+When the app loads, it will already have caffeine's SMILES string typed in. 
+1. Hit the "Run over-smoothing analysis" button.
+2. Within a few seconds, it will generate a plot showing the MAD at depths 2 through 16 for all three models. It will also print a table of the exact numbers below the plot.
+3. You can change the "Maximum depth" slider if you want to test shallower networks.
+4. You can type in your own molecules. Just remember that QM9 only covers H, C, N, O, and F atoms, so the app will throw an error if you try to use something like Chlorine. Molecules are also capped at 60 atoms so the calculations stay fast.
+
+## A quick note on the atom features
+
+The way I turn SMILES into atom features in `featurize.py` is modeled on QM9's standard setup (one-hot atom type, atomic number, aromaticity, hybridization, hydrogen count). 
+
+It is not byte-identical to PyTorch Geometric's built-in QM9 loader. PyG pulls its features from precomputed dataset files. This app builds them on the fly using RDKit. It captures the exact same chemical information, just through a different pipeline. It's more than accurate enough for a demonstration, but I wanted to be upfront about that in case you compare the raw numbers.
+```
